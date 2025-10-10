@@ -2,6 +2,10 @@
 // S. Mavromatis
 // Sequelette 3D
 #include <filesystem>
+#include <thread>
+#include <chrono>
+#include <atomic>
+#include <mutex>
 
 #include <opencv2/opencv.hpp>
 #include <GL/glew.h>
@@ -15,6 +19,12 @@
 #include <iostream>
 #include <stdexcept>
 #include <algorithm> // std::max
+
+// -------------------- Global variables for video/camera --------------------
+std::atomic<bool> g_updateTexture(false);
+std::atomic<bool> g_running(true);
+cv::Mat g_currentFrame;
+std::mutex g_frameMutex;
 
 // -------------------- AR : Données/calibration --------------------
 cv::Mat cameraMatrix, distCoeffs; // Paramètres intrinsèques
@@ -351,22 +361,180 @@ GLuint createTextureFromMat(const cv::Mat& imgRGBorRGBA) {
     return tex;
 }
 
+// -------------------- Function to update texture with new frame --------------------
+void updateTexture(GLuint texture, const cv::Mat& frame) {
+    if (frame.empty()) return;
+    
+    cv::Mat processedFrame;
+    if (frame.channels() == 3) {
+        cv::cvtColor(frame, processedFrame, cv::COLOR_BGR2RGB);
+    } else if (frame.channels() == 4) {
+        cv::cvtColor(frame, processedFrame, cv::COLOR_BGRA2RGBA);
+    } else {
+        cv::cvtColor(frame, processedFrame, cv::COLOR_GRAY2RGBA);
+    }
+    
+    cv::flip(processedFrame, processedFrame, 0);
+    
+    glBindTexture(GL_TEXTURE_2D, texture);
+    
+    GLenum format = GL_RGB;
+    if (processedFrame.channels() == 4) format = GL_RGBA;
+    else if (processedFrame.channels() == 1) format = GL_RED;
+    
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, processedFrame.cols, processedFrame.rows,
+                    format, GL_UNSIGNED_BYTE, processedFrame.data);
+    
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+// -------------------- Menu functions --------------------
+int displayModeMenu() {
+    int choice = 0;
+    std::cout << "\n=== AR Cube Application ===\n";
+    std::cout << "1. Image Mode\n";
+    std::cout << "2. Video Mode\n";
+    std::cout << "3. Camera Mode\n";
+    std::cout << "Enter your choice (1-3): ";
+    std::cin >> choice;
+    return choice;
+}
+
+int displayImageSubMenu() {
+    int choice = 0;
+    std::cout << "\n=== Image Mode ===\n";
+    std::cout << "Available images:\n";
+    std::cout << "1. image_1.jpg\n";
+    std::cout << "2. [Add more images as needed]\n";
+    std::cout << "Enter your choice: ";
+    std::cin >> choice;
+    return choice;
+}
+
+int displayVideoSubMenu() {
+    int choice = 0;
+    std::cout << "\n=== Video Mode ===\n";
+    std::cout << "Available videos:\n";
+    std::cout << "1. Video_AR_1.mp4\n";
+    std::cout << "2. [Add more videos as needed]\n";
+    std::cout << "Enter your choice: ";
+    std::cin >> choice;
+    return choice;
+}
+
+// -------------------- Video/Camera processing functions --------------------
+void processVideo(const std::string& videoPath) {
+    cv::VideoCapture cap(videoPath);
+    if (!cap.isOpened()) {
+        std::cerr << "Cannot open video: " << videoPath << std::endl;
+        return;
+    }
+    
+    cv::Mat frame;
+    while (g_running && cap.read(frame)) {
+        if (frame.empty()) break;
+        
+        {
+            std::lock_guard<std::mutex> lock(g_frameMutex);
+            frame.copyTo(g_currentFrame);
+            g_updateTexture = true;
+        }
+        
+        // Maintain video playback speed (~30 fps)
+        std::this_thread::sleep_for(std::chrono::milliseconds(33));
+    }
+    
+    cap.release();
+    std::cout << "Video playback finished." << std::endl;
+}
+
+void processCamera(int cameraId) {
+    cv::VideoCapture cap(cameraId);
+    if (!cap.isOpened()) {
+        std::cerr << "Cannot open camera: " << cameraId << std::endl;
+        return;
+    }
+    
+    cv::Mat frame;
+    while (g_running) {
+        cap >> frame;
+        if (frame.empty()) break;
+        
+        {
+            std::lock_guard<std::mutex> lock(g_frameMutex);
+            frame.copyTo(g_currentFrame);
+            g_updateTexture = true;
+        }
+        
+        // Maintain reasonable frame rate
+        std::this_thread::sleep_for(std::chrono::milliseconds(16));
+    }
+    
+    cap.release();
+    std::cout << "Camera feed stopped." << std::endl;
+}
+
 // -------------------- Programme principal ---------------------
 int main() {
     try {
         std::cout << "Current path: " << std::filesystem::current_path() << std::endl;
-        // Calcul du calibrage + PnP
+        
+        // Display mode selection menu
+        int mode = displayModeMenu();
+        std::string mediaPath;
+        bool useStaticImage = true;
+        bool useVideo = false;
+        bool useCamera = false;
+        
+        switch (mode) {
+            case 1: { // Image Mode
+                int imageChoice = displayImageSubMenu();
+                switch (imageChoice) {
+                    case 1:
+                        mediaPath = "data/image_1.jpg";
+                        break;
+                    default:
+                        mediaPath = "data/image_1.jpg";
+                        break;
+                }
+                useStaticImage = true;
+                break;
+            }
+            case 2: { // Video Mode
+                int videoChoice = displayVideoSubMenu();
+                switch (videoChoice) {
+                    case 1:
+                        mediaPath = "data/Video_AR_1.mp4";
+                        break;
+                    default:
+                        mediaPath = "data/Video_AR_1.mp4";
+                        break;
+                }
+                useVideo = true;
+                useStaticImage = false;
+                break;
+            }
+            case 3: { // Camera Mode
+                std::cout << "Enter camera ID (usually 0 for default camera): ";
+                int cameraId;
+                std::cin >> cameraId;
+                mediaPath = std::to_string(cameraId);
+                useCamera = true;
+                useStaticImage = false;
+                break;
+            }
+            default:
+                std::cout << "Invalid choice, defaulting to Image Mode.\n";
+                mediaPath = "data/image_1.jpg";
+                useStaticImage = true;
+                break;
+        }
+        
+        // Load calibration and estimate pose
         loadCalibration("data/camera.yaml");
         estimatePose();
-        
-        // L'image
-        cv::Mat image = cv::imread("data/image_1.jpg", cv::IMREAD_UNCHANGED);
-        if (image.empty()) { std::cerr << "Image not found!\n"; return -1; }
-        if (image.channels() == 3) cv::cvtColor(image, image, cv::COLOR_BGR2RGB);
-        else if (image.channels() == 4) cv::cvtColor(image, image, cv::COLOR_BGRA2RGBA);
-        cv::flip(image, image, 0);
 
-        // Init GLFW/GL
+        // Init GLFW/GL FIRST - before any OpenGL operations
         if (!glfwInit()) return -1;
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
@@ -387,6 +555,40 @@ int main() {
         }
         glGetError(); // purge l'erreur GL potentielle de GLEW
 
+        // NOW initialize background texture based on mode
+        cv::Mat initialImage;
+        GLuint bgTex;
+        
+        if (useStaticImage) {
+            // Load static image
+            initialImage = cv::imread(mediaPath, cv::IMREAD_UNCHANGED);
+            if (initialImage.empty()) { 
+                std::cerr << "Image not found: " << mediaPath << "\n"; 
+                return -1; 
+            }
+            if (initialImage.channels() == 3) 
+                cv::cvtColor(initialImage, initialImage, cv::COLOR_BGR2RGB);
+            else if (initialImage.channels() == 4) 
+                cv::cvtColor(initialImage, initialImage, cv::COLOR_BGRA2RGBA);
+            cv::flip(initialImage, initialImage, 0);
+            
+            bgTex = createTextureFromMat(initialImage);
+        } else {
+            // Create empty texture for video/camera (will be updated later)
+            cv::Mat blackImage(480, 640, CV_8UC3, cv::Scalar(0, 0, 0));
+            bgTex = createTextureFromMat(blackImage);
+            
+            // Start video/camera processing thread AFTER OpenGL is initialized
+            if (useVideo) {
+                std::thread videoThread(processVideo, mediaPath);
+                videoThread.detach();
+            } else if (useCamera) {
+                int cameraId = std::stoi(mediaPath);
+                std::thread cameraThread(processCamera, cameraId);
+                cameraThread.detach();
+            }
+        }
+
         // --- Shaders ---
         // Shaders pour le fond (VS+FS), affichage de l'image sur un plan texturé
         GLuint bgVS = compileShader(GL_VERTEX_SHADER,   BG_VS);
@@ -406,9 +608,6 @@ int main() {
         Mesh cube = createCubeWireframe(50.0f);
         Axes axes = createAxes(210.0f); // axes (X=R, Y=G, Z=B), 210 mm
 
-        // Texture du fond, l'image
-        GLuint bgTex = createTextureFromMat(image);
-
         // États GL
         glEnable(GL_DEPTH_TEST);
         glClearColor(0.05f, 0.05f, 0.06f, 1.0f);
@@ -427,8 +626,25 @@ int main() {
 
         const float THICKNESS_PX = 3.0f; // épaisseur des lignes pour le GS
 
+        std::cout << "Starting main loop..." << std::endl;
+
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
+
+            // Update texture if we have a new frame from video/camera
+            if (!useStaticImage && g_updateTexture) {
+                cv::Mat frameCopy;
+                {
+                    std::lock_guard<std::mutex> lock(g_frameMutex);
+                    if (!g_currentFrame.empty()) {
+                        frameCopy = g_currentFrame.clone();
+                    }
+                }
+                if (!frameCopy.empty()) {
+                    updateTexture(bgTex, frameCopy);
+                    g_updateTexture = false;
+                }
+            }
 
             int fbw, fbh; // taille framebuffer réelle (HiDPI inclus)
             glfwGetFramebufferSize(window, &fbw, &fbh);
@@ -481,6 +697,10 @@ int main() {
             glfwSwapBuffers(window);
         }
 
+        // Signal threads to stop
+        g_running = false;
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
         // C'est fini !
         glDeleteProgram(bgProgram);
         glDeleteProgram(lineProgram);
@@ -506,6 +726,7 @@ int main() {
 
     } catch (const std::exception& e) {
         std::cerr << "Fatal: " << e.what() << std::endl;
+        g_running = false;
         return -1;
     }
 }
