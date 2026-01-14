@@ -1,0 +1,37 @@
+%YAML:1.0
+---
+# AR Application Configuration File
+# All parameters with their default values
+
+# ===== Detection Parameters =====
+detection_history_size: 10
+detection_min_confidence: 0.6
+detection_min_detections: 3
+detection_adaptive_roi_expansion: 1.8
+detection_scales: [ 1.0, 0.8, 0.6, 1.25 ]
+
+# ===== Pose Estimation Parameters =====
+pose_history_size: 5
+pose_max_translation_jump: 200.0
+pose_max_rotation_jump: 0.5
+pose_min_reprojection_quality: 15.0
+pose_min_inliers_ratio: 75
+pose_smoothing_alpha: 0.45
+quad_smoothing_alpha: 0.6
+
+# ===== Rendering Parameters =====
+render_line_thickness_px: 3.0
+render_max_window_w: 1280
+render_max_window_h: 960
+
+# ===== Calibration Parameters =====
+calib_min_images: 5
+calib_cols: 9
+calib_rows: 6
+calib_square_size_mm: 25.0
+
+# ===== Runtime Parameters =====
+runtime_verbose: true
+runtime_show_pose_metrics: true
+runtime_pose_metrics_interval: 60
+runtime_detection_stats_interval: 30

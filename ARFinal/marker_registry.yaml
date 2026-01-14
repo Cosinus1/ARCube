@@ -1,0 +1,103 @@
+# Marker Registry Configuration
+# This file demonstrates the extensible architecture that allows adding new markers
+# and 3D objects without modifying the core codebase.
+#
+# To add a new marker-object pair:
+# 1. Add a new entry in the markers list
+# 2. Specify the marker type (A4 Paper, ArUco, etc.)
+# 3. Specify the object type (Cube, Pyramid, Sphere, etc.)
+# 4. Configure marker and object parameters
+# 5. The system will automatically load and use the new pair
+
+markers:
+  # Example 1: A4 Paper with Cube (default configuration)
+  - name: "A4_Cube_Default"
+    enabled: 1
+    marker_type: "A4 Paper"
+    marker_params:
+      width: 210.0   # A4 width in mm
+      height: 297.0  # A4 height in mm
+    object_type: "Cube"
+    object_params:
+      size: 50.0     # Cube size in mm
+    color: [0.0, 1.0, 0.0]  # RGB: Green
+
+  # Example 2: A4 Paper with Pyramid
+  - name: "A4_Pyramid_Red"
+    enabled: 1
+    marker_type: "A4 Paper"
+    marker_params:
+      width: 210.0
+      height: 297.0
+    object_type: "Pyramid"
+    object_params:
+      base: 60.0     # Base size in mm
+      height: 80.0   # Pyramid height in mm
+    color: [1.0, 0.0, 0.0]  # RGB: Red
+
+  # Example 3: A4 Paper with Sphere
+  - name: "A4_Sphere_Blue"
+    enabled: 1
+    marker_type: "A4 Paper"
+    marker_params:
+      width: 210.0
+      height: 297.0
+    object_type: "Sphere"
+    object_params:
+      radius: 30.0   # Sphere radius in mm
+      segments: 20   # Wireframe detail level
+    color: [0.0, 0.5, 1.0]  # RGB: Light Blue
+
+  # Example 4: ArUco Marker #42 with Small Cube
+  - name: "ArUco_42_Cube"
+    enabled: 0  # Disabled by default (requires ArUco marker printed)
+    marker_type: "ArUco"
+    marker_params:
+      id: 42         # ArUco marker ID
+      size: 100.0    # Marker physical size in mm
+    object_type: "Cube"
+    object_params:
+      size: 40.0
+    color: [1.0, 1.0, 0.0]  # RGB: Yellow
+
+  # Example 5: ArUco Marker #23 with Large Sphere
+  - name: "ArUco_23_Sphere"
+    enabled: 0
+    marker_type: "ArUco"
+    marker_params:
+      id: 23
+      size: 150.0
+    object_type: "Sphere"
+    object_params:
+      radius: 50.0
+      segments: 24
+    color: [1.0, 0.0, 1.0]  # RGB: Magenta
+
+# ============= HOW TO EXTEND =============
+#
+# Adding a new marker type:
+# 1. Create a class inheriting from MarkerDetector
+# 2. Implement detect(), getType(), getDimensions()
+# 3. Register in MarkerFactory::create()
+#
+# Adding a new 3D object:
+# 1. Create a class inheriting from Object3D
+# 2. Implement render(), getName(), getDescription()
+# 3. Register in ObjectFactory::create()
+#
+# Example new object (Torus):
+#
+# - name: "A4_Torus"
+#   enabled: 1
+#   marker_type: "A4 Paper"
+#   marker_params:
+#     width: 210.0
+#     height: 297.0
+#   object_type: "Torus"
+#   object_params:
+#     major_radius: 40.0
+#     minor_radius: 15.0
+#     segments: 32
+#   color: [0.5, 0.5, 0.5]
+#
+# Then implement TorusObject class and register in ObjectFactory!

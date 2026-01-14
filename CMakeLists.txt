@@ -4,4 +4,5 @@ project(AR)
 set(CMAKE_BUILD_TYPE "Release")
 add_subdirectory(ARCube)
 add_subdirectory(ARDetect)
+add_subdirectory(ARFinal)
 
