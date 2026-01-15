@@ -146,7 +146,7 @@ public:
  */
 class ArUcoMarkerDetector : public MarkerDetector {
 private:
-    cv::aruco::Dictionary dictionary;
+    cv::Ptr<cv::aruco::Dictionary> dictionary;
     int markerId;
     float markerSize;
     

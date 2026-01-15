@@ -147,6 +147,7 @@ bool A4MarkerDetector::detect(const cv::Mat& frame,
 // ============= ArUcoMarkerDetector =============
 ArUcoMarkerDetector::ArUcoMarkerDetector(int id, float size)
     : markerId(id), markerSize(size) {
+    // Store as cv::Ptr
     dictionary = cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250);
 }
 
@@ -156,7 +157,7 @@ bool ArUcoMarkerDetector::detect(const cv::Mat& frame,
     std::vector<int> ids;
     std::vector<std::vector<cv::Point2f>> markerCorners;
     
-    // Ancienne API OpenCV 4.6 (pas besoin de créer un ArucoDetector)
+    // Now dictionary is already cv::Ptr, so this works correctly
     cv::aruco::detectMarkers(frame, dictionary, markerCorners, ids);
     
     // Find our specific marker
