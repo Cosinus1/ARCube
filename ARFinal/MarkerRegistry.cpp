@@ -156,8 +156,8 @@ bool ArUcoMarkerDetector::detect(const cv::Mat& frame,
     std::vector<int> ids;
     std::vector<std::vector<cv::Point2f>> markerCorners;
     
-    cv::aruco::ArucoDetector detector(dictionary);
-    detector.detectMarkers(frame, markerCorners, ids);
+    // Ancienne API OpenCV 4.6 (pas besoin de créer un ArucoDetector)
+    cv::aruco::detectMarkers(frame, dictionary, markerCorners, ids);
     
     // Find our specific marker
     for (size_t i = 0; i < ids.size(); ++i) {
