@@ -1,3 +1,0 @@
-/home/paulh/ARCube/ARFinal/build/CMakeFiles/ARFinal.dir
-/home/paulh/ARCube/ARFinal/build/CMakeFiles/edit_cache.dir
-/home/paulh/ARCube/ARFinal/build/CMakeFiles/rebuild_cache.dir
