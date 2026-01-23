@@ -1,0 +1,21 @@
+%YAML:1.0
+---
+# Webcam camera calibration
+# For typical 640x480 webcam
+
+image_width: 640
+image_height: 480
+
+camera_matrix: !!opencv-matrix
+   rows: 3
+   cols: 3
+   dt: d
+   data: [550, 0, 320,
+          0, 550, 240,
+          0, 0, 1]
+
+distortion_coefficients: !!opencv-matrix
+   rows: 1
+   cols: 5
+   dt: d
+   data: [-0.1, 0.05, 0, 0, 0]

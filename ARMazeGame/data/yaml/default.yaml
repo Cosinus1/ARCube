@@ -1,0 +1,21 @@
+%YAML:1.0
+---
+# Default camera calibration for AR Maze Game
+# This is a generic calibration - for best results, perform actual camera calibration
+
+image_width: 640
+image_height: 480
+
+camera_matrix: !!opencv-matrix
+   rows: 3
+   cols: 3
+   dt: d
+   data: [600, 0, 320, 
+          0, 600, 240, 
+          0, 0, 1]
+
+distortion_coefficients: !!opencv-matrix
+   rows: 1
+   cols: 5
+   dt: d
+   data: [0, 0, 0, 0, 0]
