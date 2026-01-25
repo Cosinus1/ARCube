@@ -5,7 +5,7 @@
  * This application detects a flat surface (like A4 paper), renders a 3D maze on it,
  * and simulates ball physics based on surface tilt. Guide the ball to the goal!
  * 
- * Usage: ./ARMazeGame
+ * Usage: ./ARMazeGame [video_path] [calibration_yaml]
  */
 
 #include <opencv2/opencv.hpp>
@@ -14,6 +14,7 @@
 #include <chrono>
 #include <array>
 #include <algorithm>
+#include <cstdlib>
 
 #include "Utils.hpp"
 #include "Detection.hpp"
@@ -25,6 +26,13 @@
 #include "Maze.hpp"
 #include "Renderer.hpp"
 #include "GUI.hpp"
+
+// Unset problematic environment variables that can cause library conflicts
+static void fixEnvironment() {
+    // These can cause issues with snap packages and library loading
+    unsetenv("GTK_PATH");
+    unsetenv("GIO_EXTRA_MODULES");
+}
 
 // Global configuration
 const int WINDOW_WIDTH = 800;
@@ -60,7 +68,7 @@ public:
         gui->setOnQuit([this]() { running = false; });
     }
     
-    bool initialize(const std::filesystem::path& dataRoot) {
+    bool initialize(const std::filesystem::path& dataRoot, int argc = 1, char** argv = nullptr) {
         this->dataRoot = dataRoot;
         
         // Find available sources
@@ -68,24 +76,99 @@ public:
         videoDir = dataRoot / "video";
         yamlDir = dataRoot / "yaml";
         
+        std::cout << "\nLooking for sources in:\n";
+        std::cout << "  Images: " << imageDir << "\n";
+        std::cout << "  Videos: " << videoDir << "\n";
+        std::cout << "  Calibration: " << yamlDir << "\n\n";
+        
+        // Create directories if they don't exist
+        std::error_code ec;
+        std::filesystem::create_directories(imageDir, ec);
+        std::filesystem::create_directories(videoDir, ec);
+        std::filesystem::create_directories(yamlDir, ec);
+        
         // List available files
+        std::cout << "Scanning for images...\n";
         auto images = listFilesInDirectory(imageDir, {".jpg", ".jpeg", ".png", ".bmp"});
+        
+        std::cout << "Scanning for videos...\n";
         auto videos = listFilesInDirectory(videoDir, {".mp4", ".avi", ".mov", ".mkv"});
+        
+        std::cout << "Scanning for calibration files...\n";
         auto yamls = listFilesInDirectory(yamlDir, {".yaml", ".yml"});
-        auto webcams = getAvailableWebcams(5);
+        
+        // Check for webcams more quietly
+        std::cout << "Checking for webcams..." << std::flush;
+        auto webcams = getAvailableWebcams(3);  // Reduced to check fewer devices
+        std::cout << " found " << webcams.size() << "\n";
         
         gui->setImageFiles(images);
         gui->setVideoFiles(videos);
         gui->setYamlFiles(yamls);
         gui->setWebcams(webcams);
         
+        std::cout << "\n=== Summary ===\n";
         std::cout << "Found " << images.size() << " images, " 
                   << videos.size() << " videos, "
-                  << webcams.size() << " webcams\n";
+                  << webcams.size() << " webcams\n\n";
+        
+        // Handle command line arguments for direct mode
+        if (argc >= 2 && argv != nullptr) {
+            std::string arg1 = argv[1];
+            
+            if (arg1 == "--webcam") {
+                int camIdx = (argc >= 3) ? std::atoi(argv[2]) : 0;
+                directWebcamMode = true;
+                directWebcamIndex = camIdx;
+                std::cout << "Direct webcam mode: camera " << camIdx << "\n";
+            } else if (arg1 != "--help" && arg1 != "-h") {
+                // Assume it's a video/image path
+                directFilePath = arg1;
+                if (argc >= 3) {
+                    directCalibPath = argv[2];
+                }
+                std::cout << "Direct file mode: " << directFilePath << "\n";
+            }
+        }
+        
+        // Check if we have any sources at all
+        bool hasSources = !images.empty() || !videos.empty() || !webcams.empty() || 
+                          !directFilePath.empty() || directWebcamMode;
+        
+        if (!hasSources) {
+            std::cout << "\n";
+            std::cout << "========================================\n";
+            std::cout << "  NO INPUT SOURCES FOUND!\n";
+            std::cout << "========================================\n\n";
+            std::cout << "Please do one of the following:\n\n";
+            std::cout << "1. Add video files to: " << videoDir << "\n";
+            std::cout << "   Supported formats: .mp4, .avi, .mov, .mkv\n\n";
+            std::cout << "2. Add image files to: " << imageDir << "\n";
+            std::cout << "   Supported formats: .jpg, .jpeg, .png, .bmp\n\n";
+            std::cout << "3. Connect a webcam\n\n";
+            std::cout << "4. Run with a video file directly:\n";
+            std::cout << "   ./ARMazeGame path/to/video.mp4\n\n";
+            std::cout << "5. Run with webcam directly:\n";
+            std::cout << "   ./ARMazeGame --webcam 0\n\n";
+            
+            // Don't fail, let user add files and show GUI anyway
+            std::cout << "Starting in demo mode (GUI only)...\n\n";
+        }
         
         // Create window
-        cv::namedWindow(WINDOW_NAME, cv::WINDOW_AUTOSIZE);
-        cv::setMouseCallback(WINDOW_NAME, mouseCallback, gui.get());
+        try {
+            cv::namedWindow(WINDOW_NAME, cv::WINDOW_AUTOSIZE);
+            cv::setMouseCallback(WINDOW_NAME, mouseCallback, gui.get());
+        } catch (const cv::Exception& e) {
+            std::cerr << "Error creating window: " << e.what() << "\n";
+            std::cerr << "Make sure you have a display connected.\n";
+            return false;
+        }
+        
+        // If direct mode, start the game immediately
+        if (!directFilePath.empty() || directWebcamMode) {
+            startDirectMode();
+        }
         
         return true;
     }
@@ -116,6 +199,92 @@ public:
     }
 
 private:
+    void startDirectMode() {
+        std::cout << "Starting direct mode...\n";
+        
+        bool sourceOpened = false;
+        
+        if (directWebcamMode) {
+            // Try to open webcam
+            capture.open(directWebcamIndex);
+            sourceOpened = capture.isOpened();
+            isImage = false;
+            
+            if (!sourceOpened) {
+                std::cerr << "Failed to open webcam " << directWebcamIndex << "\n";
+                std::cerr << "Falling back to GUI mode.\n";
+                return;
+            }
+            std::cout << "Webcam " << directWebcamIndex << " opened successfully.\n";
+        } else if (!directFilePath.empty()) {
+            // Check if file exists
+            if (!std::filesystem::exists(directFilePath)) {
+                std::cerr << "File not found: " << directFilePath << "\n";
+                std::cerr << "Falling back to GUI mode.\n";
+                return;
+            }
+            
+            // Try as image first
+            staticImage = cv::imread(directFilePath);
+            if (!staticImage.empty()) {
+                sourceOpened = true;
+                isImage = true;
+                std::cout << "Loaded image: " << directFilePath << "\n";
+            } else {
+                // Try as video
+                capture.open(directFilePath);
+                sourceOpened = capture.isOpened();
+                isImage = false;
+                if (sourceOpened) {
+                    std::cout << "Loaded video: " << directFilePath << "\n";
+                }
+            }
+            
+            if (!sourceOpened) {
+                std::cerr << "Failed to open: " << directFilePath << "\n";
+                std::cerr << "Falling back to GUI mode.\n";
+                return;
+            }
+        }
+        
+        // Get frame size
+        cv::Mat testFrame;
+        if (isImage) {
+            testFrame = staticImage;
+        } else {
+            capture >> testFrame;
+            if (testFrame.empty()) {
+                std::cerr << "Failed to read frame.\n";
+                return;
+            }
+        }
+        
+        frameWidth = testFrame.cols;
+        frameHeight = testFrame.rows;
+        std::cout << "Frame size: " << frameWidth << "x" << frameHeight << "\n";
+        
+        // Load calibration
+        if (!directCalibPath.empty() && std::filesystem::exists(directCalibPath)) {
+            cv::Mat K, D;
+            cv::Size calibSize;
+            if (loadCalibration(directCalibPath, K, D, calibSize)) {
+                cameraMatrix = scaleIntrinsics(K, calibSize, cv::Size(frameWidth, frameHeight));
+                distCoeffs = D;
+                std::cout << "Loaded calibration: " << directCalibPath << "\n";
+            } else {
+                createDefaultCalibration(frameWidth, frameHeight, cameraMatrix, distCoeffs);
+            }
+        } else {
+            createDefaultCalibration(frameWidth, frameHeight, cameraMatrix, distCoeffs);
+        }
+        
+        // Initialize game with default maze
+        initializeGameWithMaze(MazeType::SIMPLE);
+        
+        // Switch GUI to playing mode
+        gui->setMode(AppMode::PLAYING);
+    }
+    
     void startGame() {
         std::cout << "Starting game...\n";
         
@@ -206,10 +375,11 @@ private:
         return true;
     }
     
-    void initializeGame() {
-        // Calculate play area (scaled from plane dimensions)
-        float halfW = PLANE_WIDTH * 0.45f;  // Leave margin
-        float halfH = PLANE_HEIGHT * 0.45f;
+    void initializeGameWithMaze(MazeType mazeType) {
+        // A4 dimensions: 210mm x 297mm
+        // Half dimensions with margin for gameplay
+        float halfW = (PLANE_WIDTH / 2.0f) * 0.9f;   // ~94.5mm
+        float halfH = (PLANE_HEIGHT / 2.0f) * 0.9f;  // ~133.65mm
         
         // Initialize physics
         physics.initialize(halfW, halfH, BALL_RADIUS);
@@ -217,7 +387,6 @@ private:
         
         // Generate maze
         MazeGenerator generator;
-        MazeType mazeType = gui->getSelectedMaze();
         auto walls = generator.generateMaze(mazeType, halfW, halfH, WALL_THICKNESS);
         
         for (const auto& wall : walls) {
@@ -237,6 +406,10 @@ private:
         // Reset pose tracking
         hasPrevPose = false;
         hadSmoothQuad = false;
+    }
+    
+    void initializeGame() {
+        initializeGameWithMaze(gui->getSelectedMaze());
     }
     
     void resetGame() {
@@ -396,6 +569,12 @@ private:
     std::chrono::high_resolution_clock::time_point lastTime;
     float deltaTime;
     
+    // Direct mode (command line)
+    std::string directFilePath;
+    std::string directCalibPath;
+    bool directWebcamMode = false;
+    int directWebcamIndex = 0;
+    
     // Paths
     std::filesystem::path dataRoot;
     std::filesystem::path imageDir;
@@ -433,6 +612,9 @@ private:
 };
 
 int main(int argc, char** argv) {
+    // Fix potential library conflicts
+    fixEnvironment();
+    
     std::cout << "========================================\n";
     std::cout << "       AR MAZE GAME\n";
     std::cout << "========================================\n\n";
@@ -441,13 +623,36 @@ int main(int argc, char** argv) {
     std::filesystem::path exePath = std::filesystem::path(argv[0]);
     std::filesystem::path dataRoot = resolveDataRoot(exePath);
     
-    std::cout << "Data directory: " << dataRoot << "\n\n";
+    std::cout << "Data directory: " << dataRoot << "\n";
+    
+    // Check for command line arguments for direct mode
+    if (argc >= 2) {
+        std::string arg1 = argv[1];
+        if (arg1 == "--help" || arg1 == "-h") {
+            std::cout << "\nUsage:\n";
+            std::cout << "  " << argv[0] << "                    # Interactive GUI mode\n";
+            std::cout << "  " << argv[0] << " <video_path>       # Direct video mode\n";
+            std::cout << "  " << argv[0] << " <video_path> <calibration.yaml>\n";
+            std::cout << "  " << argv[0] << " --webcam [index]   # Direct webcam mode\n";
+            std::cout << "\nExamples:\n";
+            std::cout << "  " << argv[0] << " video.mp4\n";
+            std::cout << "  " << argv[0] << " --webcam 0\n";
+            return 0;
+        }
+    }
+    
+    std::cout << "\n";
     
     // Create and run game
     ARMazeGame game;
     
-    if (!game.initialize(dataRoot)) {
+    if (!game.initialize(dataRoot, argc, argv)) {
         std::cerr << "Failed to initialize game!\n";
+        std::cerr << "\nTroubleshooting:\n";
+        std::cerr << "  1. Make sure data/ folder exists with yaml/, image/, video/ subdirectories\n";
+        std::cerr << "  2. For webcam: check if camera is connected (ls /dev/video*)\n";
+        std::cerr << "  3. Add video files to data/video/ or images to data/image/\n";
+        std::cerr << "  4. Run with a video file directly: " << argv[0] << " path/to/video.mp4\n";
         return -1;
     }
     

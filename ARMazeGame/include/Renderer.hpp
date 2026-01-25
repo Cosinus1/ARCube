@@ -46,12 +46,14 @@ public:
                      const cv::Scalar& color);
     
     /**
-     * @brief Render the ball
+     * @brief Render the ball with velocity arrows
+     * @param velocity Ball velocity for drawing direction arrows
      */
     void renderBall(cv::Mat& frame,
                     const cv::Mat& K, const cv::Mat& D,
                     const cv::Mat& rvec, const cv::Mat& tvec,
-                    const Vec2& position, float radius);
+                    const Vec2& position, float radius,
+                    const Vec2& velocity = Vec2(0, 0));
     
     /**
      * @brief Render the goal/hole

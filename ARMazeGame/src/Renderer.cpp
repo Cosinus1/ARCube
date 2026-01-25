@@ -136,8 +136,8 @@ void MazeRenderer::render(cv::Mat& frame,
     // Render goal
     renderGoal(frame, K, D, rvec, tvec, physics.getGoal());
     
-    // Render ball
-    renderBall(frame, K, D, rvec, tvec, physics.getBallPosition(), physics.getBallRadius());
+    // Render ball with velocity arrows
+    renderBall(frame, K, D, rvec, tvec, physics.getBallPosition(), physics.getBallRadius(), physics.getBallVelocity());
     
     // Render HUD
     renderHUD(frame, gameState, physics.getTilt(), true);
@@ -188,7 +188,8 @@ void MazeRenderer::renderWalls(cv::Mat& frame,
 void MazeRenderer::renderBall(cv::Mat& frame,
                                const cv::Mat& K, const cv::Mat& D,
                                const cv::Mat& rvec, const cv::Mat& tvec,
-                               const Vec2& position, float radius) {
+                               const Vec2& position, float radius,
+                               const Vec2& velocity) {
     // Ball is rendered as a filled circle at its position
     // Ball center is at Z = radius (sitting on the plane)
     cv::Point3f ballCenter(position.x, position.y, radius);
@@ -208,8 +209,52 @@ void MazeRenderer::renderBall(cv::Mat& frame,
             pixelRadius = std::max(5, std::min(50, pixelRadius));
         }
         
-        // Draw ball with gradient effect
         cv::Point center((int)ball2D[0].x, (int)ball2D[0].y);
+        
+        // Draw velocity arrows BEFORE the ball so they appear behind/beside it
+        float velScale = 0.15f;  // Scale factor for arrow length
+        float minVelForArrow = 10.0f;  // Minimum velocity to show arrow
+        
+        // X velocity arrow (Red)
+        if (std::abs(velocity.x) > minVelForArrow) {
+            cv::Point3f arrowEnd(position.x + velocity.x * velScale, position.y, radius);
+            std::vector<cv::Point3f> arrowPt = {arrowEnd};
+            std::vector<cv::Point2f> arrow2D = projectPoints3D(arrowPt, K, D, rvec, tvec);
+            
+            if (!arrow2D.empty()) {
+                cv::Scalar xColor(0, 0, 255);  // Red for X
+                cv::arrowedLine(frame, center, cv::Point((int)arrow2D[0].x, (int)arrow2D[0].y),
+                               xColor, 2, cv::LINE_AA, 0, 0.3);
+            }
+        }
+        
+        // Y velocity arrow (Green)
+        if (std::abs(velocity.y) > minVelForArrow) {
+            cv::Point3f arrowEnd(position.x, position.y + velocity.y * velScale, radius);
+            std::vector<cv::Point3f> arrowPt = {arrowEnd};
+            std::vector<cv::Point2f> arrow2D = projectPoints3D(arrowPt, K, D, rvec, tvec);
+            
+            if (!arrow2D.empty()) {
+                cv::Scalar yColor(0, 255, 0);  // Green for Y
+                cv::arrowedLine(frame, center, cv::Point((int)arrow2D[0].x, (int)arrow2D[0].y),
+                               yColor, 2, cv::LINE_AA, 0, 0.3);
+            }
+        }
+        
+        // Combined velocity arrow (Cyan) - shows actual direction
+        float speed = velocity.length();
+        if (speed > minVelForArrow) {
+            cv::Point3f arrowEnd(position.x + velocity.x * velScale, 
+                                position.y + velocity.y * velScale, radius);
+            std::vector<cv::Point3f> arrowPt = {arrowEnd};
+            std::vector<cv::Point2f> arrow2D = projectPoints3D(arrowPt, K, D, rvec, tvec);
+            
+            if (!arrow2D.empty()) {
+                cv::Scalar combinedColor(255, 255, 0);  // Cyan for combined
+                cv::arrowedLine(frame, center, cv::Point((int)arrow2D[0].x, (int)arrow2D[0].y),
+                               combinedColor, 3, cv::LINE_AA, 0, 0.25);
+            }
+        }
         
         // Outer shadow
         cv::circle(frame, cv::Point(center.x + 2, center.y + 2), pixelRadius, 

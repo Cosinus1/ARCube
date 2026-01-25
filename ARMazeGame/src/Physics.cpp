@@ -61,14 +61,24 @@ Vec2 PhysicsSimulator::calculateTilt(const cv::Mat& rvec) {
     double ny = R.at<double>(1, 2);
     double nz = R.at<double>(2, 2);
     
-    // Calculate tilt angles from normal
-    // tiltX affects ball movement in X direction
-    // tiltY affects ball movement in Y direction
-    float tiltX = (float)std::atan2(nx, std::abs(nz));
-    float tiltY = (float)std::atan2(-ny, std::abs(nz));
+    // Ensure nz is positive (surface facing camera)
+    if (nz < 0) {
+        nx = -nx;
+        ny = -ny;
+        nz = -nz;
+    }
     
-    // Clamp tilt to reasonable values (max ~30 degrees)
-    const float maxTilt = 0.52f;  // ~30 degrees in radians
+    // Avoid division by zero
+    if (nz < 0.01) nz = 0.01;
+    
+    // Calculate tilt angles from normal vector
+    // Using atan2(nx, nz) and atan2(-ny, nz) gives proper diagonal tilt
+    // when both nx and ny are non-zero simultaneously
+    float tiltX = (float)std::atan2(nx, nz);
+    float tiltY = (float)std::atan2(-ny, nz);
+    
+    // Clamp tilt to reasonable values (max ~45 degrees for more responsive diagonal movement)
+    const float maxTilt = 1.0f;  // ~45 degrees in radians
     tiltX = std::clamp(tiltX, -maxTilt, maxTilt);
     tiltY = std::clamp(tiltY, -maxTilt, maxTilt);
     
@@ -90,30 +100,33 @@ void PhysicsSimulator::update(const cv::Mat& rvec, float deltaTime) {
     // Clamp deltaTime to prevent instability
     deltaTime = std::min(deltaTime, 0.05f);
     
-    // Calculate tilt with smoothing
+    // Calculate tilt with reduced smoothing for more responsive movement
     Vec2 newTilt = calculateTilt(rvec);
-    const float tiltSmoothing = 0.25f;
+    const float tiltSmoothing = 0.4f;  // Increased from 0.25 for faster response
     currentTilt.x = currentTilt.x * (1.f - tiltSmoothing) + newTilt.x * tiltSmoothing;
     currentTilt.y = currentTilt.y * (1.f - tiltSmoothing) + newTilt.y * tiltSmoothing;
     
     // Calculate gravity acceleration based on tilt
+    // Both X and Y components are calculated independently, allowing diagonal movement
     Vec2 acceleration = calculateGravityAcceleration(currentTilt);
     
     // Semi-implicit Euler integration
-    // Update velocity first
-    ball.velocity += acceleration * deltaTime;
+    // Update velocity first - both components simultaneously for diagonal motion
+    ball.velocity.x += acceleration.x * deltaTime;
+    ball.velocity.y += acceleration.y * deltaTime;
     
-    // Apply friction
+    // Apply friction (same for both axes)
     ball.velocity *= friction;
     
-    // Cap velocity
+    // Cap velocity (using combined magnitude for proper diagonal speed)
     float speed = ball.velocity.length();
     if (speed > maxVelocity) {
         ball.velocity = ball.velocity.normalized() * maxVelocity;
     }
     
-    // Update position
-    ball.position += ball.velocity * deltaTime;
+    // Update position - both X and Y simultaneously for diagonal movement
+    ball.position.x += ball.velocity.x * deltaTime;
+    ball.position.y += ball.velocity.y * deltaTime;
     
     // Resolve collisions
     resolveWallCollisions();

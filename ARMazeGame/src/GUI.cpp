@@ -231,11 +231,17 @@ void GUIManager::createSourceSelectButtons() {
         }
         
         if (webcams.empty()) {
-            // No webcams found - show message
-            Button btn(centerX, startY, btnWidth, btnHeight, "No webcams found");
+            // No webcams found - show helpful message
+            Button btn(centerX, startY, btnWidth, btnHeight, "No webcams detected");
             btn.isEnabled = false;
             btn.normalColor = cv::Scalar(50, 50, 50);
             buttons.push_back(btn);
+            
+            // Add tip
+            Button tipBtn(centerX, startY + spacing, btnWidth, btnHeight, "Check: ls /dev/video*");
+            tipBtn.isEnabled = false;
+            tipBtn.normalColor = cv::Scalar(40, 40, 40);
+            buttons.push_back(tipBtn);
         }
     } else if (sourceList) {
         // File buttons
@@ -257,6 +263,22 @@ void GUIManager::createSourceSelectButtons() {
             btn.isEnabled = false;
             btn.normalColor = cv::Scalar(50, 50, 50);
             buttons.push_back(btn);
+            
+            // Add tip for where to put files
+            std::string tipMsg = "Add files to data/" + sourceType + "/";
+            Button tipBtn(centerX, startY + spacing, btnWidth, btnHeight, tipMsg);
+            tipBtn.isEnabled = false;
+            tipBtn.normalColor = cv::Scalar(40, 40, 40);
+            buttons.push_back(tipBtn);
+            
+            // Show supported formats
+            std::string formatMsg = sourceType == "video" ? 
+                "Formats: .mp4, .avi, .mov, .mkv" : 
+                "Formats: .jpg, .png, .bmp";
+            Button formatBtn(centerX, startY + spacing * 2, btnWidth, btnHeight, formatMsg);
+            formatBtn.isEnabled = false;
+            formatBtn.normalColor = cv::Scalar(40, 40, 40);
+            buttons.push_back(formatBtn);
         }
     }
     
@@ -379,10 +401,13 @@ void GUIManager::renderModeSelect(cv::Mat& frame) {
         drawButton(frame, btn);
     }
     
-    // Footer
+    // Footer with tips
     cv::putText(frame, "Use your webcam or select an image/video with a flat surface",
-                cv::Point(windowWidth / 2 - 250, windowHeight - 20),
-                cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(150, 150, 150), 1, cv::LINE_AA);
+                cv::Point(windowWidth / 2 - 250, windowHeight - 40),
+                cv::FONT_HERSHEY_SIMPLEX, 0.45, cv::Scalar(150, 150, 150), 1, cv::LINE_AA);
+    cv::putText(frame, "Tip: Run with video directly: ./ARMazeGame path/to/video.mp4",
+                cv::Point(windowWidth / 2 - 220, windowHeight - 20),
+                cv::FONT_HERSHEY_SIMPLEX, 0.4, cv::Scalar(120, 150, 120), 1, cv::LINE_AA);
 }
 
 void GUIManager::renderSourceSelect(cv::Mat& frame) {
