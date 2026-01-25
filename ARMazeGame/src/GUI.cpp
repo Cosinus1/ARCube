@@ -14,7 +14,7 @@ GUIManager::GUIManager(int width, int height)
     , windowHeight(height)
     , currentMode(AppMode::MODE_SELECT)
     , selectedWebcam(-1)
-    , selectedMaze(MazeType::SIMPLE)
+    , selectedMaze(MazeType::LEVEL1)
     , selectionComplete(false)
     , scrollOffset(0)
 {
@@ -153,22 +153,12 @@ void GUIManager::createModeSelectButtons() {
     
     int btnWidth = 300;
     int btnHeight = 60;
-    int startY = windowHeight / 2 - 100;
+    int startY = windowHeight / 2 - 80;
     int centerX = windowWidth / 2 - btnWidth / 2;
     int spacing = 80;
     
-    // Image mode button
-    Button imgBtn(centerX, startY, btnWidth, btnHeight, "IMAGE MODE");
-    imgBtn.normalColor = cv::Scalar(60, 100, 60);
-    imgBtn.hoverColor = cv::Scalar(80, 140, 80);
-    imgBtn.onClick = [this]() {
-        sourceType = "image";
-        setMode(AppMode::SOURCE_SELECT);
-    };
-    buttons.push_back(imgBtn);
-    
     // Video mode button
-    Button vidBtn(centerX, startY + spacing, btnWidth, btnHeight, "VIDEO MODE");
+    Button vidBtn(centerX, startY, btnWidth, btnHeight, "VIDEO MODE");
     vidBtn.normalColor = cv::Scalar(60, 60, 100);
     vidBtn.hoverColor = cv::Scalar(80, 80, 140);
     vidBtn.onClick = [this]() {
@@ -178,7 +168,7 @@ void GUIManager::createModeSelectButtons() {
     buttons.push_back(vidBtn);
     
     // Webcam mode button
-    Button camBtn(centerX, startY + spacing * 2, btnWidth, btnHeight, "WEBCAM MODE");
+    Button camBtn(centerX, startY + spacing, btnWidth, btnHeight, "WEBCAM MODE");
     camBtn.normalColor = cv::Scalar(100, 60, 60);
     camBtn.hoverColor = cv::Scalar(140, 80, 80);
     camBtn.onClick = [this]() {
@@ -188,7 +178,7 @@ void GUIManager::createModeSelectButtons() {
     buttons.push_back(camBtn);
     
     // Quit button
-    Button quitBtn(centerX, startY + spacing * 3 + 20, btnWidth, btnHeight, "QUIT");
+    Button quitBtn(centerX, startY + spacing * 2 + 20, btnWidth, btnHeight, "QUIT");
     quitBtn.normalColor = cv::Scalar(80, 40, 40);
     quitBtn.hoverColor = cv::Scalar(120, 60, 60);
     quitBtn.onClick = [this]() {
@@ -208,9 +198,7 @@ void GUIManager::createSourceSelectButtons() {
     
     std::vector<std::string>* sourceList = nullptr;
     
-    if (sourceType == "image") {
-        sourceList = &imageFiles;
-    } else if (sourceType == "video") {
+    if (sourceType == "video") {
         sourceList = &videoFiles;
     }
     
@@ -272,9 +260,7 @@ void GUIManager::createSourceSelectButtons() {
             buttons.push_back(tipBtn);
             
             // Show supported formats
-            std::string formatMsg = sourceType == "video" ? 
-                "Formats: .mp4, .avi, .mov, .mkv" : 
-                "Formats: .jpg, .png, .bmp";
+            std::string formatMsg = "Formats: .mp4, .avi, .mov, .mkv";
             Button formatBtn(centerX, startY + spacing * 2, btnWidth, btnHeight, formatMsg);
             formatBtn.isEnabled = false;
             formatBtn.normalColor = cv::Scalar(40, 40, 40);
@@ -297,9 +283,9 @@ void GUIManager::createMazeSelectButtons() {
     
     int btnWidth = 250;
     int btnHeight = 50;
-    int startY = 150;
+    int startY = 200;
     int centerX = windowWidth / 2 - btnWidth / 2;
-    int spacing = 65;
+    int spacing = 70;
     
     auto mazeTypes = MazeGenerator::getAllMazeTypes();
     
@@ -307,17 +293,13 @@ void GUIManager::createMazeSelectButtons() {
         std::string name = MazeGenerator::getMazeTypeName(mazeTypes[i]);
         Button btn(centerX, startY + (int)i * spacing, btnWidth, btnHeight, name);
         
-        // Color based on difficulty
+        // Color based on level
         switch (mazeTypes[i]) {
-            case MazeType::SIMPLE:
+            case MazeType::LEVEL1:
                 btn.normalColor = cv::Scalar(60, 120, 60);
                 btn.hoverColor = cv::Scalar(80, 160, 80);
                 break;
-            case MazeType::MEDIUM:
-                btn.normalColor = cv::Scalar(120, 120, 60);
-                btn.hoverColor = cv::Scalar(160, 160, 80);
-                break;
-            case MazeType::HARD:
+            case MazeType::LEVEL2:
                 btn.normalColor = cv::Scalar(120, 60, 60);
                 btn.hoverColor = cv::Scalar(160, 80, 80);
                 break;
@@ -402,7 +384,7 @@ void GUIManager::renderModeSelect(cv::Mat& frame) {
     }
     
     // Footer with tips
-    cv::putText(frame, "Use your webcam or select an image/video with a flat surface",
+    cv::putText(frame, "Use your webcam or select a video with a flat surface",
                 cv::Point(windowWidth / 2 - 250, windowHeight - 40),
                 cv::FONT_HERSHEY_SIMPLEX, 0.45, cv::Scalar(150, 150, 150), 1, cv::LINE_AA);
     cv::putText(frame, "Tip: Run with video directly: ./ARMazeGame path/to/video.mp4",
@@ -422,8 +404,8 @@ void GUIManager::renderSourceSelect(cv::Mat& frame) {
 }
 
 void GUIManager::renderMazeSelect(cv::Mat& frame) {
-    drawTitle(frame, "Select Maze");
-    drawSubtitle(frame, "Choose difficulty level", 100);
+    drawTitle(frame, "Select Level");
+    drawSubtitle(frame, "Choose your challenge", 100);
     
     for (const auto& btn : buttons) {
         drawButton(frame, btn);

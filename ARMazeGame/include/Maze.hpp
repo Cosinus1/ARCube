@@ -7,11 +7,8 @@
  * @brief Maze layout types
  */
 enum class MazeType {
-    SIMPLE,         // Easy maze for beginners
-    MEDIUM,         // Medium difficulty
-    HARD,           // Challenging maze
-    SPIRAL,         // Spiral pattern
-    ZIGZAG          // Zigzag pattern
+    LEVEL1,         // First level (previously HARD)
+    LEVEL2          // Second level (harder than level 1)
 };
 
 /**
@@ -54,11 +51,8 @@ public:
     static std::vector<MazeType> getAllMazeTypes();
 
 private:
-    std::vector<WallSegment> generateSimpleMaze(float halfW, float halfH, float thickness);
-    std::vector<WallSegment> generateMediumMaze(float halfW, float halfH, float thickness);
-    std::vector<WallSegment> generateHardMaze(float halfW, float halfH, float thickness);
-    std::vector<WallSegment> generateSpiralMaze(float halfW, float halfH, float thickness);
-    std::vector<WallSegment> generateZigzagMaze(float halfW, float halfH, float thickness);
+    std::vector<WallSegment> generateLevel1Maze(float halfW, float halfH, float thickness);
+    std::vector<WallSegment> generateLevel2Maze(float halfW, float halfH, float thickness);
 };
 
 /**

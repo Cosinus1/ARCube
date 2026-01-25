@@ -48,9 +48,10 @@ std::vector<cv::Point2f> orderQuadRobust(const std::vector<cv::Point2f>& quadRaw
     
     // Rotate array so top-left is first
     std::vector<cv::Point2f> O(4);
-    for (int i = 0; i < 4; ++i) {
-        O[i] = P[(tl + i) % 4];
-    }
+    O[0] = P[(tl + 0) % 4];  // TL
+    O[1] = P[(tl + 1) % 4];  // BL
+    O[2] = P[(tl + 2) % 4];  // BR
+    O[3] = P[(tl + 3) % 4];  // TR 
     
     return O;
 }

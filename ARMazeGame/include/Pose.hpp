@@ -4,7 +4,7 @@
 
 /**
  * @brief Estimates pose from quadrilateral using homography decomposition
- * @param quadTLTRBRBL Ordered image points (TL, TR, BR, BL)
+ * @param quadTLBLBRTR Ordered image points (TL, BL, BR, TR)
  * @param K Camera intrinsic matrix
  * @param D Distortion coefficients
  * @param side Physical size of the marker (in meters or mm)
@@ -12,7 +12,7 @@
  * @param tvec Output translation vector
  * @return true if pose estimation successful
  */
-bool poseFromQuadHomography(const std::vector<cv::Point2f>& quadTLTRBRBL,
+bool poseFromQuadHomography(const std::vector<cv::Point2f>& quadTLBLBRTR,
                             const cv::Mat& K, const cv::Mat& D,
                             double side, cv::Mat& rvec, cv::Mat& tvec);
 

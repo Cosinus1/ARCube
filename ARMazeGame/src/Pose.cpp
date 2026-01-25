@@ -1,11 +1,18 @@
 #include "Pose.hpp"
 #include <cmath>
 
-bool poseFromQuadHomography(const std::vector<cv::Point2f>& quadTLTRBRBL,
+bool poseFromQuadHomography(const std::vector<cv::Point2f>& quadTLBLBRTR,
                             const cv::Mat& K, const cv::Mat& D,
                             double side, cv::Mat& rvec, cv::Mat& tvec) {
-    if (quadTLTRBRBL.size() != 4) return false;
+    if (quadTLBLBRTR.size() != 4) return false;
     
+    
+    // Input order: TL, BL, BR, TR
+    std::vector<cv::Point2f> quadTLTRBRBL(4);
+    quadTLTRBRBL[0] = quadTLBLBRTR[0];  // TL 
+    quadTLTRBRBL[1] = quadTLBLBRTR[3];  // TR 
+    quadTLTRBRBL[2] = quadTLBLBRTR[2];  // BR 
+    quadTLTRBRBL[3] = quadTLBLBRTR[1];  // BL 
     const double s = side;
     
     // Object points (square centered at origin)

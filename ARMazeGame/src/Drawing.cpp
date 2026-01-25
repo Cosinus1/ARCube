@@ -13,12 +13,12 @@ void drawLabeledQuad(cv::Mat& frame, const std::vector<cv::Point2f>& q) {
     }
     
     // Draw corner markers with labels
-    const char* labels[] = {"TL", "TR", "BR", "BL"};
+    const char* labels[] = {"TL", "BL", "BR", "TR"};
     cv::Scalar colors[] = {
         {0, 0, 255},   // Red for TL
-        {0, 255, 0},   // Green for TR
+        {0, 255, 0},   // Green for BL 
         {255, 0, 0},   // Blue for BR
-        {255, 255, 0}  // Cyan for BL
+        {255, 255, 0}  // Cyan for TR 
     };
     
     for (int i = 0; i < 4; ++i) {
