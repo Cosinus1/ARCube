@@ -5,10 +5,10 @@
 PhysicsSimulator::PhysicsSimulator()
     : halfW(100.f)
     , halfH(140.f)
-    , gravity(500.f)      // Gravity acceleration (units/s²)
-    , friction(0.985f)    // Rolling friction (velocity retention per frame)
-    , bounciness(0.4f)    // Bounce coefficient
-    , maxVelocity(400.f)  // Maximum velocity cap
+    , gravity(500.f)      
+    , friction(0.985f)    
+    , bounciness(0.4f)    
+    , maxVelocity(400.f)
     , initialized(false)
 {
 }
@@ -72,15 +72,9 @@ Vec2 PhysicsSimulator::calculateTilt(const cv::Mat& rvec) {
     if (nz < 0.01) nz = 0.01;
     
     // Calculate tilt angles from normal vector
-    // Using atan2(nx, nz) and atan2(-ny, nz) gives proper diagonal tilt
-    // when both nx and ny are non-zero simultaneously
+
     float tiltX = (float)std::atan2(-nx, nz);
     float tiltY = (float)std::atan2(ny, nz);
-    
-    // Clamp tilt to reasonable values (max ~45 degrees for more responsive diagonal movement)
-    //const float maxTilt = 1.0f;  // ~45 degrees in radians
-    //tiltX = std::clamp(tiltX, -maxTilt, maxTilt);
-    //tiltY = std::clamp(tiltY, -maxTilt, maxTilt);
     
     return Vec2(tiltX, tiltY);
 }
@@ -102,15 +96,13 @@ void PhysicsSimulator::update(const cv::Mat& rvec, float deltaTime) {
     
     // Calculate tilt with reduced smoothing for more responsive movement
     Vec2 newTilt = calculateTilt(rvec);
-    const float tiltSmoothing = 0.4f;  // Increased from 0.25 for faster response
+    const float tiltSmoothing = 0.4f;
     currentTilt.x = currentTilt.x * (1.f - tiltSmoothing) + newTilt.x * tiltSmoothing;
     currentTilt.y = currentTilt.y * (1.f - tiltSmoothing) + newTilt.y * tiltSmoothing;
     
     // Calculate gravity acceleration based on tilt
-    // Both X and Y components are calculated independently, allowing diagonal movement
     Vec2 acceleration = calculateGravityAcceleration(currentTilt);
     
-    // Semi-implicit Euler integration
     // Update velocity first - both components simultaneously for diagonal motion
     ball.velocity.x += acceleration.x * deltaTime;
     ball.velocity.y += acceleration.y * deltaTime;
@@ -152,7 +144,7 @@ bool PhysicsSimulator::checkWallCollision(const WallSegment& wall, Vec2& normal,
     float threshold = ball.radius + wall.thickness * 0.5f;
     
     if (dist < threshold && dist > 0.001f) {
-        normal = diff * (1.f / dist);  // Normalize
+        normal = diff * (1.f / dist);
         penetration = threshold - dist;
         return true;
     }
@@ -181,7 +173,7 @@ void PhysicsSimulator::resolveWallCollisions() {
                 float normalVelocity = ball.velocity.dot(normal);
                 if (normalVelocity < 0) {
                     ball.velocity = ball.velocity - normal * ((1.f + bounciness) * normalVelocity);
-                    ball.velocity *= 0.9f;  // Extra friction on collision
+                    ball.velocity *= 0.9f;  // friction to avoid hyperspeed
                 }
             }
         }
