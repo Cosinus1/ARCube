@@ -74,13 +74,13 @@ Vec2 PhysicsSimulator::calculateTilt(const cv::Mat& rvec) {
     // Calculate tilt angles from normal vector
     // Using atan2(nx, nz) and atan2(-ny, nz) gives proper diagonal tilt
     // when both nx and ny are non-zero simultaneously
-    float tiltX = (float)std::atan2(nx, nz);
-    float tiltY = (float)std::atan2(-ny, nz);
+    float tiltX = (float)std::atan2(-nx, nz);
+    float tiltY = (float)std::atan2(ny, nz);
     
     // Clamp tilt to reasonable values (max ~45 degrees for more responsive diagonal movement)
-    const float maxTilt = 1.0f;  // ~45 degrees in radians
-    tiltX = std::clamp(tiltX, -maxTilt, maxTilt);
-    tiltY = std::clamp(tiltY, -maxTilt, maxTilt);
+    //const float maxTilt = 1.0f;  // ~45 degrees in radians
+    //tiltX = std::clamp(tiltX, -maxTilt, maxTilt);
+    //tiltY = std::clamp(tiltY, -maxTilt, maxTilt);
     
     return Vec2(tiltX, tiltY);
 }

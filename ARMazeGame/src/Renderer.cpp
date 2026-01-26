@@ -51,13 +51,14 @@ void MazeRenderer::drawWallSegment3D(cv::Mat& frame,
     float halfThick = wall.thickness * 0.5f;
     
     // Calculate 8 corners of the wall box
+    // X is left-right, Y is up-down in maze coordinates, Z is height
     std::vector<cv::Point3f> corners3D = {
-        // Bottom face
+        // Bottom face (Z=0)
         cv::Point3f(wall.p1.x - norm.x * halfThick, wall.p1.y - norm.y * halfThick, 0),
         cv::Point3f(wall.p1.x + norm.x * halfThick, wall.p1.y + norm.y * halfThick, 0),
         cv::Point3f(wall.p2.x + norm.x * halfThick, wall.p2.y + norm.y * halfThick, 0),
         cv::Point3f(wall.p2.x - norm.x * halfThick, wall.p2.y - norm.y * halfThick, 0),
-        // Top face (Z is up/out of plane in our coordinate system)
+        // Top face (Z=height)
         cv::Point3f(wall.p1.x - norm.x * halfThick, wall.p1.y - norm.y * halfThick, height),
         cv::Point3f(wall.p1.x + norm.x * halfThick, wall.p1.y + norm.y * halfThick, height),
         cv::Point3f(wall.p2.x + norm.x * halfThick, wall.p2.y + norm.y * halfThick, height),
@@ -152,12 +153,13 @@ void MazeRenderer::renderPlaneOutline(cv::Mat& frame,
                                        const cv::Mat& K, const cv::Mat& D,
                                        const cv::Mat& rvec, const cv::Mat& tvec,
                                        float halfW, float halfH) {
-    // Define plane corners
+    // Define plane corners in correct coordinate system
+    // X: left (-) to right (+), Y: bottom (-) to top (+), Z: into surface
     std::vector<cv::Point3f> planeCorners = {
-        cv::Point3f(-halfW, -halfH, 0),
-        cv::Point3f(halfW, -halfH, 0),
-        cv::Point3f(halfW, halfH, 0),
-        cv::Point3f(-halfW, halfH, 0)
+        cv::Point3f(-halfW, +halfH, 0),  // TL
+        cv::Point3f(+halfW, +halfH, 0),  // TR
+        cv::Point3f(+halfW, -halfH, 0),  // BR
+        cv::Point3f(-halfW, -halfH, 0)   // BL
     };
     
     std::vector<cv::Point2f> corners2D = projectPoints3D(planeCorners, K, D, rvec, tvec);

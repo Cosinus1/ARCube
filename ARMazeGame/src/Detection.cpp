@@ -48,10 +48,9 @@ std::vector<cv::Point2f> orderQuadRobust(const std::vector<cv::Point2f>& quadRaw
     
     // Rotate array so top-left is first
     std::vector<cv::Point2f> O(4);
-    O[0] = P[(tl + 0) % 4];  // TL
-    O[1] = P[(tl + 1) % 4];  // BL
-    O[2] = P[(tl + 2) % 4];  // BR
-    O[3] = P[(tl + 3) % 4];  // TR 
+    for (int i = 0; i < 4; ++i) {
+        O[i] = P[(tl + i) % 4];
+    }
     
     return O;
 }
@@ -155,13 +154,13 @@ bool detectSheetAdaptive(const cv::Mat& frame,
         stdVal = stdScalar[0];
     }
 
-    // Adaptive Canny thresholds
-    double baseLow = 30.0;
-    double baseHigh = 120.0;
+    // LOWERED Canny thresholds for more continuous detection
+    double baseLow = 25.0;    // Was 30.0
+    double baseHigh = 100.0;  // Was 120.0
     double textureFactor = std::clamp(stdVal / 40.0, 0.4, 1.6);
     double exposureFactor = std::clamp(meanVal / 128.0, 0.6, 1.4);
-    double cannyLow = std::clamp(baseLow * textureFactor * exposureFactor, 20.0, 80.0);
-    double cannyHigh = std::clamp(baseHigh * textureFactor * exposureFactor, 80.0, 220.0);
+    double cannyLow = std::clamp(baseLow * textureFactor * exposureFactor, 18.0, 75.0);   // Lowered min from 20
+    double cannyHigh = std::clamp(baseHigh * textureFactor * exposureFactor, 75.0, 210.0); // Lowered min from 80
 
     cv::Mat edges;
     cv::Canny(gray, edges, cannyLow, cannyHigh);
@@ -169,8 +168,8 @@ bool detectSheetAdaptive(const cv::Mat& frame,
     // Check edge density
     double edgeRatio = (double)cv::countNonZero(edges) / (edges.rows * edges.cols);
     
-    // If too few edges, try Otsu thresholding
-    if (edgeRatio < 0.005) {
+    // LOWERED threshold for Otsu fallback
+    if (edgeRatio < 0.004) {  // Was 0.005
         cv::Mat otsu;
         cv::threshold(gray, otsu, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
         cv::Canny(otsu, edges, cannyLow * 0.5, cannyHigh * 0.5);
@@ -181,7 +180,7 @@ bool detectSheetAdaptive(const cv::Mat& frame,
     cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(morphK, morphK));
     cv::morphologyEx(edges, edges, cv::MORPH_CLOSE, kernel);
 
-    // Find contours
+    // Find contours - EXTERNAL only (ignores internal rectangles)
     std::vector<std::vector<cv::Point>> contours;
     cv::findContours(edges, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
@@ -200,19 +199,22 @@ bool detectSheetAdaptive(const cv::Mat& frame,
         if (approx.size() != 4 || !cv::isContourConvex(approx)) continue;
         
         double area = std::fabs(cv::contourArea(approx));
-        if (area < 0.002 * frameArea) continue;  // Too small
+        
+        // LOWERED minimum area for more continuous detection
+        if (area < 0.0015 * frameArea) continue;  // Was 0.002
         
         cv::Rect br = cv::boundingRect(approx);
         double w = br.width, h = br.height;
         if (w < 10 || h < 10) continue;
         
-        // Check aspect ratio
+        // Check aspect ratio - RELAXED tolerance
         double ar = std::max(w, h) / std::max(1.0, std::min(w, h));
         double arErr = std::fabs(ar - A4_AR) / A4_AR;
-        if (arErr > 0.35) continue;
+        if (arErr > 0.45) continue;  // Was 0.35 - more lenient
 
-        // Score based on area and aspect ratio match
-        double score = area * (1.0 - arErr);
+        // Score based on AREA (biggest wins) and aspect ratio match
+        // Area heavily weighted - ensures LARGEST rectangle is chosen
+        double score = area * (1.0 - arErr * 0.3);  // Reduced AR penalty from 1.0 to 0.3
         if (score > bestScore) {
             bestScore = score;
             bestPoly = approx;
@@ -237,12 +239,12 @@ bool detectSheetAdaptive(const cv::Mat& frame,
     
     corners = ordered;
 
-    // Calculate confidence
-    double textureScore = std::clamp(stdVal / 60.0, 0.3, 1.0);
+    // MORE GENEROUS confidence calculation
+    double textureScore = std::clamp(stdVal / 60.0, 0.4, 1.0);  // Raised min from 0.3
     double areaNorm = bestScore / frameArea;
-    double areaScore = std::clamp(areaNorm / 0.15, 0.0, 1.0);
-    double edgeScore = std::clamp(edgeRatio / 0.04, 0.2, 1.0);
-    confidence = 0.55 + 0.15 * textureScore + 0.15 * areaScore + 0.15 * edgeScore;
+    double areaScore = std::clamp(areaNorm / 0.12, 0.0, 1.0);   // Lowered threshold from 0.15
+    double edgeScore = std::clamp(edgeRatio / 0.035, 0.3, 1.0); // Lowered threshold, raised min
+    confidence = 0.60 + 0.12 * textureScore + 0.15 * areaScore + 0.13 * edgeScore;  // Higher base
 
     return true;
 }

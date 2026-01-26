@@ -6,26 +6,28 @@ bool poseFromQuadHomography(const std::vector<cv::Point2f>& quadTLBLBRTR,
                             double side, cv::Mat& rvec, cv::Mat& tvec) {
     if (quadTLBLBRTR.size() != 4) return false;
     
-    
     // Input order: TL, BL, BR, TR
+    // Convert to standard order for getPerspectiveTransform: TL, TR, BR, BL
     std::vector<cv::Point2f> quadTLTRBRBL(4);
     quadTLTRBRBL[0] = quadTLBLBRTR[0];  // TL 
     quadTLTRBRBL[1] = quadTLBLBRTR[3];  // TR 
     quadTLTRBRBL[2] = quadTLBLBRTR[2];  // BR 
     quadTLTRBRBL[3] = quadTLBLBRTR[1];  // BL 
+    
     const double s = side;
     
-    // Object points (square centered at origin)
+    // Object points (square on XY plane, Z=0)
+    // Use standard right-handed coordinate system
     std::vector<cv::Point2f> obj2 = {
-        { (float)(-s * 0.5f), (float)(-s * 0.5f) }, // TL
-        { (float)(+s * 0.5f), (float)(-s * 0.5f) }, // TR
-        { (float)(+s * 0.5f), (float)(+s * 0.5f) }, // BR
-        { (float)(-s * 0.5f), (float)(+s * 0.5f) }  // BL
+        { (float)(-s * 0.5f), (float)(+s * 0.5f) }, // TL: left, top
+        { (float)(+s * 0.5f), (float)(+s * 0.5f) }, // TR: right, top
+        { (float)(+s * 0.5f), (float)(-s * 0.5f) }, // BR: right, bottom
+        { (float)(-s * 0.5f), (float)(-s * 0.5f) }  // BL: left, bottom
     };
 
     // Undistort image points
     std::vector<cv::Point2f> und;
-    cv::undistortPoints(quadTLTRBRBL, und, K, D); // Returns normalized coordinates (x/z, y/z)
+    cv::undistortPoints(quadTLTRBRBL, und, K, D);
 
     // Compute homography from object to normalized image coordinates
     cv::Mat H = cv::getPerspectiveTransform(obj2, und);
@@ -55,8 +57,8 @@ bool poseFromQuadHomography(const std::vector<cv::Point2f>& quadTLBLBRTR,
     // Translation
     cv::Mat t = lambda * h3;
 
-    // Ensure the object is in front of the camera
-    if (R.at<double>(2, 2) > 0) {
+    // Ensure the object is in front of the camera (positive Z in camera coordinates)
+    if (t.at<double>(2) < 0) {
         R = -R;
         t = -t;
     }
@@ -72,10 +74,10 @@ void projectSquareBase(double side, const cv::Mat& K, const cv::Mat& D,
                        std::vector<cv::Point2f>& out2d) {
     float a = 0.5f * (float)side;
     std::vector<cv::Point3f> base = {
-        {-a, -a, 0},
-        {+a, -a, 0},
-        {+a, +a, 0},
-        {-a, +a, 0}
+        {-a, +a, 0},  // TL
+        {+a, +a, 0},  // TR
+        {+a, -a, 0},  // BR
+        {-a, -a, 0}   // BL
     };
     cv::projectPoints(base, rvec, tvec, K, D, out2d);
 }
