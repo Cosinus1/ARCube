@@ -47,6 +47,10 @@
  const float BALL_RADIUS = 8.0f;
  const float WALL_HEIGHT = 25.0f;
  const float WALL_THICKNESS = 5.0f;
+
+ // Webcam rotation - change this if your webcam orientation doesn't match movements
+ // Options: Rot::NONE, Rot::CW (90° clockwise), Rot::CCW (90° counter-clockwise)
+ const Rot WEBCAM_ROTATION = Rot::CCW;  // Rotate 90° counter-clockwise to fix orientation
  
  class ARMazeGame {
  public:
@@ -237,6 +241,11 @@
              return;
          }
          
+         // Apply rotation for webcam
+         if (directWebcamMode) {
+             rotateFrameInPlace(testFrame, WEBCAM_ROTATION);
+         }
+         
          frameWidth = testFrame.cols;
          frameHeight = testFrame.rows;
          std::cout << "Frame size: " << frameWidth << "x" << frameHeight << "\n";
@@ -296,6 +305,11 @@
              std::cerr << "Failed to read test frame!\n";
              gui->resetSelection();
              return;
+         }
+         
+         // Apply rotation for webcam
+         if (gui->isWebcamMode()) {
+             rotateFrameInPlace(testFrame, WEBCAM_ROTATION);
          }
          
          frameWidth = testFrame.cols;
@@ -401,6 +415,11 @@
                  gui->resetSelection();
                  return;
              }
+         }
+         
+         // Apply rotation for webcam to match physical movements
+         if (gui->isWebcamMode() || directWebcamMode) {
+             rotateFrameInPlace(frame, WEBCAM_ROTATION);
          }
          
          // Convert to grayscale for detection
